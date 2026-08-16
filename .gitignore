@@ -1,0 +1,38 @@
+# ===== Python 缓存与编译产物 =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+wheels/
+
+# ===== 虚拟环境 =====
+.venv/
+venv/
+env/
+ENV/
+
+# ===== 敏感配置（包含真实 API Key，禁止提交！）=====
+config.json
+.env
+.env.*
+.env.local
+
+# ===== IDE 编辑器 =====
+.idea/
+.vscode/*
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+
+# ===== 操作系统文件 =====
+.DS_Store
+Thumbs.db
+
+# ===== 日志 =====
+*.log

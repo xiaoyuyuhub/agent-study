@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>流式输出（Streaming）完全图解</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+    :root {
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --accent2: #a78bfa;
+        --green: #4ade80;
+        --yellow: #facc15;
+        --red: #f87171;
+        --border: #334155;
+        --code-bg: #0b1120;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        line-height: 1.8;
+        padding: 40px 20px;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    h1 {
+        font-size: 2.2em;
+        text-align: center;
+        margin-bottom: 10px;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .subtitle { text-align: center; color: var(--muted); margin-bottom: 40px; }
+    h2 {
+        font-size: 1.6em;
+        margin: 50px 0 20px;
+        padding-left: 14px;
+        border-left: 5px solid var(--accent);
+    }
+    h3 {
+        font-size: 1.25em;
+        margin: 30px 0 15px;
+        color: var(--accent2);
+    }
+    p { margin: 12px 0; }
+    .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin: 16px 0;
+    }
+    .highlight { color: var(--yellow); font-weight: 600; }
+    .key { color: var(--accent); font-weight: 600; }
+    .warn { color: var(--red); font-weight: 600; }
+    .ok { color: var(--green); font-weight: 600; }
+    code {
+        background: var(--code-bg);
+        padding: 2px 8px;
+        border-radius: 5px;
+        font-family: "SF Mono", "Fira Code", Menlo, monospace;
+        font-size: 0.9em;
+        color: #7dd3fc;
+    }
+    pre {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 20px;
+        overflow-x: auto;
+        margin: 16px 0;
+        font-family: "SF Mono", "Fira Code", Menlo, monospace;
+        font-size: 0.88em;
+        line-height: 1.6;
+    }
+    pre .cmt { color: #64748b; font-style: italic; }
+    pre .str { color: #86efac; }
+    pre .num { color: #fbbf24; }
+    pre .kw { color: #c084fc; }
+    pre .fn { color: #7dd3fc; }
+    pre .arr { color: #f472b6; }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: 0.92em;
+    }
+    th, td {
+        border: 1px solid var(--border);
+        padding: 10px 14px;
+        text-align: left;
+    }
+    th {
+        background: #263449;
+        color: var(--accent);
+        font-weight: 600;
+    }
+    tr:nth-child(even) { background: #1a2637; }
+    .diagram {
+        background: #0b1120;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        margin: 20px 0;
+        text-align: center;
+    }
+    .callout {
+        border-left: 4px solid var(--accent);
+        background: #16233b;
+        padding: 14px 18px;
+        border-radius: 0 8px 8px 0;
+        margin: 16px 0;
+    }
+    .callout.warn-box { border-left-color: var(--red); background: #2b1616; }
+    .callout.tip-box { border-left-color: var(--green); background: #122b1a; }
+    .chunk-demo {
+        font-family: "SF Mono", Menlo, monospace;
+        background: var(--code-bg);
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        color: #86efac;
+    }
+    .step-num {
+        display: inline-block;
+        width: 26px; height: 26px;
+        line-height: 26px;
+        text-align: center;
+        background: var(--accent);
+        color: #0f172a;
+        border-radius: 50%;
+        font-weight: 700;
+        margin-right: 8px;
+        font-size: 0.85em;
+    }
+    .legend { display: flex; gap: 20px; flex-wrap: wrap; margin: 10px 0; }
+    .legend span { font-size: 0.85em; color: var(--muted); }
+    .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>流式输出（Streaming）完全图解</h1>
+<p class="subtitle">对应代码：agent_v3.py 的 StreamingLLM 类（第 324~500 行）</p>
+
+<!-- ═══════════════════════ 第一章 ═══════════════════════ -->
+<h2>一、先建立直觉：非流式 vs 流式</h2>
+
+<p>想象你在等一封长信：</p>
+
+<div class="card">
+    <p><span class="key">非流式（stream=False）</span> —— 对方把整封信写完，才一次性寄给你。</p>
+    <pre><span class="cmt"># 请求发出后，你在屏幕前干等 8 秒</span>
+<span class="fn">client</span>.chat.completions.<span class="fn">create</span>(stream=<span class="kw">False</span>)
+<span class="cmt"># ... 8秒后 ...</span>
+response.choices[0].message.content
+<span class="arr"># → "北京今天28度晴，适合出行"  (一次性拿到全文)</span></pre>
+</div>
+
+<div class="card">
+    <p><span class="key">流式（stream=True）</span> —— 对方写一个字，就寄给你一个字。</p>
+    <pre><span class="cmt"># 请求发出后 0.3 秒，第一个字就来了</span>
+<span class="fn">client</span>.chat.completions.<span class="fn">create</span>(stream=<span class="kw">True</span>)
+<span class="cmt"># 边生成边收到："北" → "京" → "今天" → "28" → "度" → ...</span></pre>
+</div>
+
+<div class="diagram">
+<div class="mermaid">
+sequenceDiagram
+    participant C as 客户端
+    participant S as 服务端(LLM)
+
+    Note over C,S: 非流式 (stream=False)
+    C->>S: 请求生成回答
+    Note over S: 生成全部内容(8秒)
+    S-->>C: 一次性返回完整回答
+    Note over C: 用户干等8秒
+
+    Note over C,S: 流式 (stream=True)
+    C->>S: 请求生成回答(stream=true)
+    S-->>C: chunk1: "北"
+    S-->>C: chunk2: "京"
+    S-->>C: chunk3: "今天"
+    S-->>C: chunk4: "28"
+    S-->>C: chunkN: [DONE]
+    Note over C: 0.3秒就看到第一个字
+</div>
+</div>
+
+<!-- ═══════════════════════ 第二章 ═══════════════════════ -->
+<h2>二、三个核心概念：chunk / delta / event</h2>
+
+<div class="card">
+    <p><span class="step-num">1</span><span class="key">event（事件）</span> —— SSE 协议里服务端推送的最小单元，一行 <code>data: {...}</code></p>
+    <p><span class="step-num">2</span><span class="key">chunk（块）</span> —— 代码里 <code>for chunk in stream</code> 每次迭代拿到的东西，就是一个 event 里的 JSON</p>
+    <p><span class="step-num">3</span><span class="key">delta（增量）</span> —— chunk 里真正携带新内容的字段 <code>chunk.choices[0].delta</code></p>
+</div>
+
+<div class="callout">
+    <p>一句话总结：<span class="highlight">一个 chunk = 一个 event 的数据 = 一次服务端推送</span>。里面可能含一点文字（<code>delta.content</code>）或一点工具调用信息（<code>delta.tool_calls</code>）。</p>
+</div>
+
+<p>一个 chunk 的完整真实结构长这样（OpenAI 协议）：</p>
+<pre>{
+  <span class="str">"choices"</span>: [
+    {
+      <span class="str">"index"</span>: <span class="num">0</span>,
+      <span class="str">"delta"</span>: {
+        <span class="str">"content"</span>: <span class="str">"北"</span>          <span class="cmt"># 增量文本（可能为 null）</span>
+        <span class="cmt"># 或 "tool_calls": [...]   # 增量工具调用（可能为 null）</span>
+      },
+      <span class="str">"finish_reason"</span>: <span class="kw">null</span>   <span class="cmt"># 流结束原因，只有最后一个chunk才非null</span>
+    }
+  ]
+}</pre>
+
+<!-- ═══════════════════════ 第三章 ═══════════════════════ -->
+<h2>三、真实数据：一次流式调用到底收到什么</h2>
+
+<p>假设任务是 <code>"查北京天气"</code>，LLM 决定调用工具 <code>get_weather(city="北京")</code>。服务端实际推送的 chunk 序列如下：</p>
+
+<div class="card">
+    <h3>📦 chunk 1（第一个事件）</h3>
+    <p>此时 <code>delta.content</code> 是 <code>null</code>，但 <code>delta.tool_calls</code> 出现了，带出工具名：</p>
+    <pre>{ <span class="str">"choices"</span>: [{ <span class="str">"delta"</span>: {
+    <span class="str">"tool_calls"</span>: [
+      { <span class="str">"index"</span>: <span class="num">0</span>, <span class="str">"id"</span>: <span class="str">"call_abc123"</span>,
+        <span class="str">"function"</span>: { <span class="str">"name"</span>: <span class="str">"get_weather"</span>, <span class="str">"arguments"</span>: <span class="str">""</span> } }
+    ]
+  }, <span class="str">"finish_reason"</span>: <span class="kw">null</span> }] }</pre>
+</div>
+
+<div class="card">
+    <h3>📦 chunk 2</h3>
+    <p>arguments 开始分批到达，这次只来了 <code>{"city"</code>：</p>
+    <pre>{ <span class="str">"choices"</span>: [{ <span class="str">"delta"</span>: {
+    <span class="str">"tool_calls"</span>: [
+      { <span class="str">"index"</span>: <span class="num">0</span>,
+        <span class="str">"function"</span>: { <span class="str">"arguments"</span>: <span class="str">"{\"city\""</span> } }
+    ]
+  }, <span class="str">"finish_reason"</span>: <span class="kw">null</span> }] }</pre>
+</div>
+
+<div class="card">
+    <h3>📦 chunk 3</h3>
+    <pre>{ <span class="str">"choices"</span>: [{ <span class="str">"delta"</span>: {
+    <span class="str">"tool_calls"</span>: [
+      { <span class="str">"index"</span>: <span class="num">0</span>,
+        <span class="str">"function"</span>: { <span class="str">"arguments"</span>: <span class="str">":\"北京\""</span> } }
+    ]
+  }, <span class="str">"finish_reason"</span>: <span class="kw">null</span> }] }</pre>
+</div>
+
+<div class="card">
+    <h3>📦 chunk 4</h3>
+    <pre>{ <span class="str">"choices"</span>: [{ <span class="str">"delta"</span>: {
+    <span class="str">"tool_calls"</span>: [
+      { <span class="str">"index"</span>: <span class="num">0</span>,
+        <span class="str">"function"</span>: { <span class="str">"arguments"</span>: <span class="str">"}"</span> } }
+    ]
+  }, <span class="str">"finish_reason"</span>: <span class="kw">null</span> }] }</pre>
+</div>
+
+<div class="card">
+    <h3>📦 chunk 5（最后一个事件）</h3>
+    <p>没有 delta 内容了，<code>finish_reason</code> 变成 <code>"tool_calls"</code>，表示流结束：</p>
+    <pre>{ <span class="str">"choices"</span>: [{ <span class="str">"delta"</span>: {}, <span class="str">"finish_reason"</span>: <span class="str">"tool_calls"</span> }] }</pre>
+</div>
+
+<div class="callout tip-box">
+    <p>💡 <span class="ok">看懂了吗？</span> 工具参数 <code>{"city":"北京"}</code> 被拆成了 3 个 chunk（<code>{"city"</code> → <code>:"北京"</code> → <code>}</code>），所以你的代码必须<span class="highlight">把它们拼起来</span>。这就是流式 + Function Calling 的核心难点。</p>
+</div>
+
+<!-- ═══════════════════════ 第四章 ═══════════════════════ -->
+<h2>四、方法1：stream_text（纯文本场景）</h2>
+
+<p>这是最简单的情况，用于 Planner 输出计划、Reviewer 输出总结等<span class="key">不需要工具</span>的场景。</p>
+
+<h3>4.1 完整代码逐行讲解</h3>
+<pre><span class="kw">@staticmethod</span>
+<span class="kw">def</span> <span class="fn">stream_text</span>(messages, model, on_token=<span class="kw">None</span>):
+    full_text = <span class="str">""</span>                      <span class="cmt"># ① 准备一个空桶，装拼接结果</span>
+
+    stream = client.chat.completions.create(
+        model=model, messages=messages,
+        stream=<span class="kw">True</span>,                       <span class="cmt"># ② 核心开关：开启流式</span>
+    )
+
+    <span class="kw">for</span> chunk <span class="kw">in</span> stream:               <span class="cmt"># ③ 每次迭代 = 收到一个 event</span>
+        <span class="kw">if</span> chunk.choices <span class="kw">and</span> chunk.choices[0].delta:
+            delta = chunk.choices[0].delta   <span class="cmt"># ④ 取出增量数据</span>
+            <span class="kw">if</span> delta.content:                <span class="cmt"># ⑤ 有文字才处理</span>
+                token = delta.content          <span class="cmt"># ⑥ 拿到这一小片文字</span>
+                full_text += token             <span class="cmt"># ⑦ 拼进桶里</span>
+                <span class="kw">if</span> on_token:
+                    on_token(token)            <span class="cmt"># ⑧ 回调（自定义处理）</span>
+                <span class="kw">else</span>:
+                    print(token, end=<span class="str">""</span>, flush=<span class="kw">True</span>)  <span class="cmt"># ⑨ 实时打印</span>
+
+    <span class="kw">return</span> full_text                     <span class="cmt"># ⑩ 返回完整拼接结果</span></pre>
+
+<h3>4.2 真实数据走一遍</h3>
+<p>假设 LLM 回答 <code>"北京今天28度晴"</code>，循环执行过程：</p>
+
+<table>
+    <tr><th>循环次数</th><th>delta.content</th><th>full_text 变成</th><th>屏幕显示</th></tr>
+    <tr><td>第1次</td><td class="chunk-demo">北京</td><td>"北京"</td><td>北京</td></tr>
+    <tr><td>第2次</td><td class="chunk-demo">今天</td><td>"北京今天"</td><td>北京今天</td></tr>
+    <tr><td>第3次</td><td class="chunk-demo">28</td><td>"北京今天28"</td><td>北京今天28</td></tr>
+    <tr><td>第4次</td><td class="chunk-demo">度</td><td>"北京今天28度"</td><td>北京今天28度</td></tr>
+    <tr><td>第5次</td><td class="chunk-demo">晴</td><td>"北京今天28度晴"</td><td>北京今天28度晴</td></tr>
+    <tr><td>第6次</td><td class="chunk-demo">(null)</td><td>不变</td><td>不变（流结束）</td></tr>
+</table>
+
+<div class="diagram">
+<div class="mermaid">
+flowchart TD
+    A[stream_text 被调用] --> B[初始化 full_text = 空字符串]
+    B --> C[create stream=True 发起请求]
+    C --> D{for chunk 循环<br/>还有下一个 event 吗?}
+    D -->|有| E[取 delta = chunk.choices0.delta]
+    E --> F{delta.content<br/>有内容吗?}
+    F -->|有| G[full_text += token<br/>实时打印 token]
+    F -->|无| H[跳过]
+    G --> D
+    H --> D
+    D -->|没有| I[return full_text<br/>返回完整拼接结果]
+    style A fill:#16233b,stroke:#38bdf8,color:#e2e8f0
+    style I fill:#122b1a,stroke:#4ade80,color:#e2e8f0
+</div>
+</div>
+
+<!-- ═══════════════════════ 第五章 ═══════════════════════ -->
+<h2>五、方法2：stream_with_tools（Function Calling 场景）★重点★</h2>
+
+<p>这是最复杂、分支最多的方法。它要同时处理<span class="key">文字</span>和<span class="key">工具调用</span>两种增量。</p>
+
+<h3>5.1 完整代码逐行讲解</h3>
+<pre><span class="kw">@staticmethod</span>
+<span class="kw">def</span> <span class="fn">stream_with_tools</span>(messages, tools, model, on_text=<span class="kw">None</span>):
+
+    <span class="cmt"># ── ① 三个关键变量 ──</span>
+    tool_calls_acc = {}   <span class="cmt"># 工具调用累加器，结构 {index: {id, function:{name, arguments}}}</span>
+    full_text = <span class="str">""</span>      <span class="cmt"># 文本累加器（和 stream_text 一样）</span>
+    finish_reason = <span class="kw">None</span>  <span class="cmt"># 记录流结束原因</span>
+
+    stream = client.chat.completions.create(
+        model=model, messages=messages, tools=tools,
+        stream=<span class="kw">True</span>,
+    )
+
+    <span class="kw">for</span> chunk <span class="kw">in</span> stream:
+        <span class="kw">if</span> <span class="kw">not</span> chunk.choices:
+            <span class="kw">continue</span>               <span class="cmt"># ② 防御：空 choices 直接跳过</span>
+
+        delta = chunk.choices[0].delta
+
+        <span class="cmt"># ── ③ 分支A：处理纯文本 ──</span>
+        <span class="kw">if</span> delta.content:
+            token = delta.content
+            full_text += token
+            <span class="kw">if</span> on_text: on_text(token)
+            <span class="kw">else</span>: print(token, end=<span class="str">""</span>, flush=<span class="kw">True</span>)
+
+        <span class="cmt"># ── ④ 分支B：处理工具调用 ──</span>
+        <span class="kw">if</span> delta.tool_calls:
+            <span class="kw">for</span> tc_delta <span class="kw">in</span> delta.tool_calls:
+                idx = tc_delta.index     <span class="cmt"># 工具序号(0,1,2...)，LLM可一次调多个工具</span>
+
+                <span class="cmt"># ⑤ 第一次见到这个 index，先初始化累加器</span>
+                <span class="kw">if</span> idx <span class="kw">not</span> <span class="kw">in</span> tool_calls_acc:
+                    tool_calls_acc[idx] = {
+                        <span class="str">"id"</span>: <span class="str">""</span>,
+                        <span class="str">"function"</span>: {<span class="str">"name"</span>: <span class="str">""</span>, <span class="str">"arguments"</span>: <span class="str">""</span>},
+                    }
+
+                <span class="cmt"># ⑥ id 通常只在第一个 chunk 出现</span>
+                <span class="kw">if</span> tc_delta.id:
+                    tool_calls_acc[idx][<span class="str">"id"</span>] = tc_delta.id
+
+                <span class="cmt"># ⑦ 工具名通常只在第一个 chunk 出现</span>
+                <span class="kw">if</span> tc_delta.function <span class="kw">and</span> tc_delta.function.name:
+                    tool_calls_acc[idx][<span class="str">"function"</span>][<span class="str">"name"</span>] = tc_delta.function.name
+
+                <span class="cmt"># ⑧ 参数是 JSON 字符串，分散在多个 chunk，逐段拼接 ★核心★</span>
+                <span class="kw">if</span> tc_delta.function <span class="kw">and</span> tc_delta.function.arguments:
+                    tool_calls_acc[idx][<span class="str">"function"</span>][<span class="str">"arguments"</span>] += tc_delta.function.arguments
+
+        <span class="cmt"># ── ⑨ 记录 finish_reason（只有最后 chunk 才有值）──</span>
+        <span class="kw">if</span> chunk.choices[0].finish_reason:
+            finish_reason = chunk.choices[0].finish_reason
+
+    <span class="cmt"># ── ⑩ 流结束，判断返回哪种类型 ──</span>
+    <span class="kw">if</span> finish_reason == <span class="str">"tool_calls"</span> <span class="kw">and</span> tool_calls_acc:
+        <span class="kw">return</span> {<span class="str">"type"</span>: <span class="str">"tool_calls"</span>, <span class="str">"calls"</span>: [...]}   <span class="cmt"># 要调工具</span>
+    <span class="kw">else</span>:
+        <span class="kw">return</span> {<span class="str">"type"</span>: <span class="str">"text"</span>, <span class="str">"content"</span>: full_text}     <span class="cmt"># 纯文本</span></pre>
+
+<h3>5.2 核心难点：tool_calls_acc 是怎么一步步拼出来的</h3>
+
+<p>回到第三章的真实数据，我们跟踪 <code>tool_calls_acc</code> 这个变量在每个 chunk 之后的变化：</p>
+
+<table>
+    <tr><th>处理完哪个chunk</th><th>id</th><th>name</th><th>arguments（拼接过程）</th></tr>
+    <tr><td>初始</td><td class="chunk-demo">(还没初始化)</td><td>—</td><td>—</td></tr>
+    <tr><td>chunk 1</td><td class="chunk-demo">call_abc123</td><td class="chunk-demo">get_weather</td><td class="chunk-demo">""</td></tr>
+    <tr><td>chunk 2</td><td class="chunk-demo">call_abc123</td><td class="chunk-demo">get_weather</td><td class="chunk-demo">{"city"</td></tr>
+    <tr><td>chunk 3</td><td class="chunk-demo">call_abc123</td><td class="chunk-demo">get_weather</td><td class="chunk-demo">{"city":"北京"</td></tr>
+    <tr><td>chunk 4</td><td class="chunk-demo">call_abc123</td><td class="chunk-demo">get_weather</td><td class="chunk-demo">{"city":"北京"}</td></tr>
+</table>
+
+<div class="callout">
+    <p>🎯 注意看 <code>arguments</code> 这一列，它靠 <code>+=</code> 运算符，把 3 个 chunk 的碎片 <span class="highlight">"{"city"" + ":"北京"" + "}"</span> 拼成了完整的 <span class="highlight">'{"city":"北京"}'</span>。这就是 <code>tool_calls_acc[idx]["function"]["arguments"] += ...</code> 这行代码的意义。</p>
+</div>
+
+<h3>5.3 最终返回值</h3>
+<p>循环结束后，<code>finish_reason == "tool_calls"</code>，走 ⑩ 的第一个分支，返回：</p>
+<pre>{
+  <span class="str">"type"</span>: <span class="str">"tool_calls"</span>,
+  <span class="str">"calls"</span>: [
+    {
+      <span class="str">"id"</span>: <span class="str">"call_abc123"</span>,
+      <span class="str">"function"</span>: {
+        <span class="str">"name"</span>: <span class="str">"get_weather"</span>,
+        <span class="str">"arguments"</span>: <span class="str">'{"city":"北京"}'</span>   <span class="cmt"># 已经拼完整的 JSON 字符串</span>
+      }
+    }
+  ]
+}</pre>
+
+<h3>5.4 完整流程图</h3>
+<div class="diagram">
+<div class="mermaid">
+flowchart TD
+    A["stream_with_tools 被调用"] --> B["初始化:<br/>tool_calls_acc = {}<br/>full_text = ''<br/>finish_reason = None"]
+    B --> C["create(stream=True, tools=tools)"]
+    C --> D{"for chunk 循环<br/>还有 event?"}
+
+    D -->|是| E{"chunk.choices<br/>非空?"}
+    E -->|否| D
+    E -->|是| F["delta = chunk.choices0.delta"]
+
+    F --> G{"delta.content<br/>有文字?"}
+    G -->|是| G1["full_text += token<br/>实时打印"]
+    G -->|否| G2["跳过文本"]
+
+    F --> H{"delta.tool_calls<br/>有工具调用?"}
+    H -->|是| H1["遍历每个 tc_delta<br/>取 idx = index"]
+    H -->|否| H2["跳过工具"]
+
+    H1 --> I{"idx 已存在?"}
+    I -->|否| I1["初始化累加器<br/>tool_calls_acc[idx]"]
+    I -->|是| I2["跳过初始化"]
+    I1 --> J["拼接 id / name / arguments"]
+    I2 --> J
+
+    J --> K["记录 finish_reason"]
+    G1 --> K
+    G2 --> K
+    H2 --> K
+    K --> D
+
+    D -->|否| L{"finish_reason<br/>== 'tool_calls'?"}
+    L -->|是| M["return type=tool_calls<br/>calls=[...]"]
+    L -->|否| N["return type=text<br/>content=full_text"]
+
+    style A fill:#16233b,stroke:#38bdf8,color:#e2e8f0
+    style M fill:#2b1616,stroke:#f87171,color:#e2e8f0
+    style N fill:#122b1a,stroke:#4ade80,color:#e2e8f0
+</div>
+</div>
+
+<!-- ═══════════════════════ 第六章 ═══════════════════════ -->
+<h2>六、两个方法什么时候用谁</h2>
+
+<table>
+    <tr><th>场景</th><th>用哪个方法</th><th>为什么</th></tr>
+    <tr><td>Planner 输出计划</td><td><code>stream_text</code></td><td>纯文本，不需要 tools</td></tr>
+    <tr><td>Reviewer 最终回答</td><td><code>stream_text</code></td><td>纯文本总结</td></tr>
+    <tr><td>Manager 最终汇总</td><td><code>stream_text</code></td><td>纯文本</td></tr>
+    <tr><td>流式 ReAct 循环</td><td><code>stream_with_tools</code></td><td>需要边想边调工具</td></tr>
+    <tr><td>Worker 执行子任务</td><td><code>stream_with_tools</code></td><td>需要 Function Calling</td></tr>
+</table>
+
+<!-- ═══════════════════════ 第七章 ═══════════════════════ -->
+<h2>七、容易踩的坑</h2>
+
+<div class="callout warn-box">
+    <p><span class="warn">坑1：忘记拼接 arguments</span> —— 如果只取第一个 chunk 的 arguments，你会得到残缺的 <code>{"city"</code>，导致 <code>json.loads</code> 失败。</p>
+</div>
+
+<div class="callout warn-box">
+    <p><span class="warn">坑2：忘记处理 finish_reason</span> —— 不判断 <code>finish_reason</code> 就无法知道流里到底有没有工具调用，也就无法区分"返回文本"还是"返回工具调用"。</p>
+</div>
+
+<div class="callout warn-box">
+    <p><span class="warn">坑3：多工具调用时 index 混淆</span> —— LLM 一次可能返回多个 tool_call（index=0,1,2），必须用 <code>index</code> 区分，否则两个工具的参数会混在一起。</p>
+</div>
+
+<div class="callout tip-box">
+    <p><span class="ok">调试技巧</span>：在 <code>for chunk in stream:</code> 那一行打断点，按一次 F5 看一个 chunk，你会亲眼看到 <code>delta.content</code> 和 <code>delta.tool_calls</code> 怎么交替出现、怎么一点点拼起来。</p>
+</div>
+
+<!-- ═══════════════════════ 第八章 ═══════════════════════ -->
+<h2>八、完整时序图（含代码对应关系）</h2>
+
+<div class="diagram">
+<div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant Code as 你的代码
+    participant API as 服务端(LLM)
+
+    U->>Code: 调用 run_streaming_react(task)
+    Code->>Code: 组装 messages
+    Code->>API: create(stream=True, tools=TOOLS)
+    Note over Code,API: stream_with_tools 内部循环
+
+    API-->>Code: chunk1: tool_calls[{index:0, name:get_weather}]
+    Code->>Code: 初始化 tool_calls_acc[0]
+
+    API-->>Code: chunk2: arguments='{"city"'
+    Code->>Code: arguments += '{"city"'
+
+    API-->>Code: chunk3: arguments=':"北京"'
+    Code->>Code: arguments += ':"北京"'
+
+    API-->>Code: chunk4: arguments='}'
+    Code->>Code: arguments += '}'
+
+    API-->>Code: chunk5: finish_reason='tool_calls'
+    Code->>Code: 循环结束，检测 finish_reason
+
+    Code->>Code: 返回 {type:tool_calls, calls:[...]}
+    Code->>Code: json.loads(arguments) → {city:"北京"}
+    Code->>Code: execute_tool_safely("get_weather", {city:"北京"})
+    Code->>API: 把工具结果塞进 messages，再次 create(stream=True)
+
+    API-->>Code: chunk: content="北京28度"
+    Code-->>U: 实时打印 "北京28度"
+
+    API-->>Code: chunk: finish_reason='stop'
+    Code->>Code: 返回 {type:text, content:"北京28度"}
+    Code-->>U: 任务完成
+</div>
+</div>
+
+<h2 style="text-align:center; margin-top:60px;">—— 完 ——</h2>
+
+</div>
+<script>
+    mermaid.initialize({ startOnLoad: true, theme: 'dark', themeVariables: {
+        darkMode: true,
+        background: '#0b1120',
+        primaryColor: '#1e293b',
+        primaryTextColor: '#e2e8f0',
+        primaryBorderColor: '#38bdf8',
+        lineColor: '#94a3b8',
+        secondaryColor: '#16233b',
+        tertiaryColor: '#0b1120',
+        actorBkg: '#16233b',
+        actorBorder: '#38bdf8',
+        actorTextColor: '#e2e8f0',
+        noteBkgColor: '#2b1616',
+        noteTextColor: '#fca5a5',
+        noteBorderColor: '#f87171',
+        sequenceNumberColor: '#0f172a'
+    }});
+</script>
+</body>
+</html>

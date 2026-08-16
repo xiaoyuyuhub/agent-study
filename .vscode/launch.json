@@ -1,0 +1,49 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "调试 Agent v1 (基础版)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/agent.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "调试 Agent v2 (工程化+RAG+反思)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/agent_v2.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "v3-多Agent协作 (默认)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/agent_v3.py",
+            "args": ["--mode", "multi"],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "v3-Plan-Execute模式",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/agent_v3.py",
+            "args": ["--mode", "plan"],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "v3-流式ReAct模式",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/agent_v3.py",
+            "args": ["--mode", "stream"],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}

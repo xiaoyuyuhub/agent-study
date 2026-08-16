@@ -1,0 +1,10 @@
+{
+    "base_url": "https://api.deepseek.com",
+    "api_key": "sk-在这里填你的APIKey",
+    "model": "deepseek-v4-flash",
+    "max_steps": 10,
+    "enable_reflection": true,
+    "max_replans": 3,
+    "stream_output": true,
+    "parallel_tools": false
+}

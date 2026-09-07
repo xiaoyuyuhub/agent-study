@@ -22,6 +22,9 @@ config.json
 .env.*
 .env.local
 
+# ===== 运行时数据（长期记忆存储，属于用户数据，不提交）=====
+memory_store.json
+
 # ===== IDE 编辑器 =====
 .idea/
 .vscode/*

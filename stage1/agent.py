@@ -22,7 +22,8 @@ from openai import OpenAI
 # ============================================================
 # 第零部分：读配置（url 和 token 从 config.json 里读，不写死在代码里）
 # ============================================================
-CONFIG_PATH = Path(__file__).parent / "config.json"
+# 配置文件在项目根目录（本文件在 stage1/ 子目录，所以要向上找一级）
+CONFIG_PATH = Path(__file__).parent.parent / "config.json"
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = json.load(f)

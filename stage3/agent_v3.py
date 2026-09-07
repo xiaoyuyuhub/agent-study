@@ -36,7 +36,8 @@ from openai import OpenAI
 # ╔══════════════════════════════════════════════════════════════╗
 # ║  第零部分：配置读取                                            ║
 # ╚══════════════════════════════════════════════════════════════╝
-CONFIG_PATH = Path(__file__).parent / "config.json"
+# 配置文件在项目根目录（本文件在 stage3/ 子目录，所以要向上找一级）
+CONFIG_PATH = Path(__file__).parent.parent / "config.json"
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = json.load(f)
 
@@ -81,7 +82,7 @@ def get_weather(city: str) -> str:
 
 
 # ── RAG 知识检索（从 v2 复用）──
-KB_DIR = Path(__file__).parent / "knowledge_base"
+KB_DIR = Path(__file__).parent.parent / "knowledge_base"  # 知识库在项目根目录
 
 
 def _tokenize(text: str) -> list[str]:

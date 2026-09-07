@@ -29,7 +29,8 @@ from openai import OpenAI
 # ║  第零部分：读配置                                              ║
 # ║  把 url / token / model / 参数都从 config.json 读，不写死     ║
 # ╚══════════════════════════════════════════════════════════════╝
-CONFIG_PATH = Path(__file__).parent / "config.json"
+# 配置文件在项目根目录（本文件在 stage2/ 子目录，所以要向上找一级）
+CONFIG_PATH = Path(__file__).parent.parent / "config.json"
 
 with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     config = json.load(f)
@@ -68,7 +69,7 @@ ENABLE_REFLECTION = config.get("enable_reflection", True)
 # ╚══════════════════════════════════════════════════════════════╝
 
 # 知识库文件夹路径，里面放 .txt 文档
-KB_DIR = Path(__file__).parent / "knowledge_base"
+KB_DIR = Path(__file__).parent.parent / "knowledge_base"  # 知识库在项目根目录
 
 
 def _tokenize(text: str) -> list[str]:

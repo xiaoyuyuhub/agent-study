@@ -24,6 +24,13 @@ agent-study/
 │   ├── v5_dag.py             #   工具依赖图 DAG 调度器
 │   ├── a2a_server.py         #   A2A Remote Agent（服务端）
 │   └── a2a_client.py         #   A2A Client（客户端）
+├── stage6/                   # 阶段6：生产级进阶（6个方向）
+│   ├── v6_embedding.py       #   记忆向量化（embedding 语义检索）
+│   ├── v6_scheduler.py       #   自动记忆整合（后台定时任务）
+│   ├── v6_llm_compiler.py    #   LLMCompiler（LLM 自动生成 DAG）
+│   ├── v6_a2a_stream.py      #   A2A 流式响应（SSE）
+│   ├── v6_orchestrator.py    #   多 Agent 编排
+│   └── v6_observability.py   #   可观测性（Trace/Span）
 ├── config.example.json       # 配置模板（提交）
 ├── config.json               # 本地配置（已 gitignore，含真实 key）
 ├── requirements.txt          # 依赖
@@ -36,7 +43,8 @@ agent-study/
 │   ├── notes-03-plan-multiagent-streaming.md  # 阶段3笔记
 │   ├── notes-03-streaming-deep-dive.md        # 流式输出专题
 │   ├── notes-04-memory-parallel-hitl-mcp.md   # 阶段4笔记
-│   └── notes-05-memory-dag-a2a.md             # 阶段5笔记
+│   ├── notes-05-memory-dag-a2a.md             # 阶段5笔记
+│   └── notes-06-production-advanced.md        # 阶段6笔记
 └── .vscode/
     └── launch.json           # 调试配置
 ```
@@ -50,6 +58,7 @@ agent-study/
 | 阶段3 | `stage3/agent_v3.py` | Plan-Execute、多 Agent 协作、流式输出 |
 | 阶段4 | `stage4/agent_v4.py` | 长期记忆、工具并行、Human-in-the-loop、MCP |
 | 阶段5 | `stage5/agent_v5.py` | 记忆压缩、记忆淘汰、工具依赖图、A2A 协议 |
+| 阶段6 | `stage6/` | 记忆向量化、自动记忆整合、LLMCompiler、A2A流式、多Agent编排、可观测性 |
 
 对应的学习笔记在 `docs/` 目录，图文并茂，配合代码食用。
 
@@ -80,6 +89,15 @@ python stage5/v5_dag.py              # 阶段5：DAG依赖图独立测试
 # 阶段5 A2A（需要两个终端，先服务端后客户端）
 python stage5/a2a_server.py
 python stage5/a2a_client.py
+python stage6/v6_embedding.py        # 阶段6：记忆向量化（零依赖）
+python stage6/v6_scheduler.py        # 阶段6：自动记忆整合（零依赖）
+python stage6/v6_llm_compiler.py --demo   # 阶段6：LLMCompiler（零依赖模拟）
+python stage6/v6_llm_compiler.py          # 阶段6：LLMCompiler（真实LLM）
+# 阶段6 A2A 流式（需要两个终端，先服务端后客户端）
+python stage6/v6_a2a_stream.py --mode server
+python stage6/v6_a2a_stream.py --mode client
+python stage6/v6_orchestrator.py     # 阶段6：多Agent编排（零依赖）
+python stage6/v6_observability.py    # 阶段6：可观测性（零依赖）
 ```
 
 ## 配置说明
@@ -126,3 +144,5 @@ VSCode / CodeBuddy 打开项目，按 `F5` 调试。`.vscode/launch.json` 已配
 8. 跑 `stage4/agent_v4.py`，体验长期记忆 / 并行 / HITL / MCP
 9. 读 `docs/notes-05-memory-dag-a2a.md`，理解记忆维护 + 依赖图 + A2A
 10. 跑 `stage5/` 各文件，体验记忆压缩 / 淘汰 / DAG / A2A
+11. 读 `docs/notes-06-production-advanced.md`，理解六个生产级进阶能力
+12. 跑 `stage6/` 各文件，体验语义检索 / 自动维护 / 自规划 / 流式 / 编排 / 可观测

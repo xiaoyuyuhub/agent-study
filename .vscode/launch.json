@@ -84,6 +84,56 @@
             "program": "${workspaceFolder}/stage5/v5_dag.py",
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "阶段6-记忆向量化",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/stage6/v6_embedding.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "阶段6-自动记忆整合",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/stage6/v6_scheduler.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "阶段6-LLMCompiler(demo)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/stage6/v6_llm_compiler.py",
+            "args": ["--demo"],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "阶段6-A2A流式(server)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/stage6/v6_a2a_stream.py",
+            "args": ["--mode", "server"],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "阶段6-多Agent编排",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/stage6/v6_orchestrator.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "阶段6-可观测性",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/stage6/v6_observability.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

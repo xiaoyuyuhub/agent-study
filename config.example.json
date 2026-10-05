@@ -10,5 +10,6 @@
     "enable_hitl": true,
     "enable_mcp": true,
     "memory_max_entries": 15,
-    "memory_max_age_days": 30
+    "memory_max_age_days": 30,
+    "embedding_model": "text-embedding-3-small"
 }
